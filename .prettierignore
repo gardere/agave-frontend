@@ -5,3 +5,6 @@ package.json
 CHANGELOG.md
 packages/hardhat/test/fixture-projects/hardhat-project/typechain/**
 **/*.sol
+artifacts
+cache
+node_modules
