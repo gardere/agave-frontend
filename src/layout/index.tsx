@@ -1,84 +1,82 @@
-import React from 'react';
-import Header from '../components/Header';
-import Button from '../components/Button';
-import UnlockWallet from '../components/UnlockWallet';
-import styled from 'styled-components';
-import { useAmbientConnection } from '../hooks/injectedConnectors';
+import React from "react";
+import glowingAgave from "../assets/image/glowing-agave.svg";
+import Header from "../components/Header";
+import UnlockWallet from "../components/UnlockWallet";
+import { Box, Center, HStack, Image, Text } from "@chakra-ui/react";
+import { useAmbientConnection } from "../hooks/injectedConnectors";
 
-const LayoutWrapper = styled.div`
-  width: 100%;
-  margin: 0 auto;
-  background: rgb(241, 241, 243);
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 0%;
-  position: relative;
-  overflow: hidden;
-  height: 100vh;
-
-  .screen {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 0%;
-    overflow: auto;
-    position: relative;
-    z-index: 2;
-
-    .screen-top-content {
-      background-color: ${props => props.theme.color.grey[200]};
-      padding: 7px 20px 10px;
-      position: relative;
-      box-sizing: border-box;
-
-      &:after {
-        content: "";
-        position: absolute;
-        top: 0px;
-        left: 0px;
-        height: 90px;
-        width: 100%;
-        background-color: ${props => props.theme.color.grey[200]};
-        transition: all 0.1s ease-in-out 0s;
-        z-index: -1;
-      }
-
-      .ag-balance {
-        display: flex;
-        justify-content: flex-end;
-        z-index: 3;
-
-        .ag-balance-button {
-          .ag-balance-button-value {
-
-          }
-        }
-      }
-    }
-  }
-`;
-
-const Layout: React.FC<{}> = ({children}) => {
+export const Layout: React.FC<{ header: React.ReactNode }> = ({
+  header,
+  children,
+}) => {
   const { active: activeConnection } = useAmbientConnection();
 
-  return (
-    <LayoutWrapper>
-      {!activeConnection ? (
-        <UnlockWallet />
+  const headerMemo = React.useMemo(
+    () =>
+      !activeConnection ? (
+        <Text textAlign="left" w="90%" color="white">
+          Please connect your wallet
+        </Text>
       ) : (
-        <>
-          <Header/>
-          <main className="screen">
-            <div className="screen-top-content">
-              <div className="ag-balance">
-                <Button size="sm" variant="primary" text="0 AG" />
-              </div>
-            </div>
-            {children}
-          </main>
-        </>
-      )}
-    </LayoutWrapper>
+        header
+      ),
+    [activeConnection, header]
   );
-}
 
-export default Layout;
+  const childrenMemo = React.useMemo(
+    () =>
+      !activeConnection ? (
+        <HStack
+          spacing={{ base: "2.4rem", md: "1.6rem" }}
+          height={{ base: "100%" }}
+        >
+          <UnlockWallet />
+        </HStack>
+      ) : (
+        children
+      ),
+    [activeConnection, children]
+  );
+
+  return (
+    <Box
+      position="relative"
+      bg="secondary.900"
+      minH="100vh"
+      maxH="100%"
+      overflow={{ base: "visible", md: "hidden" }}
+      pb={{ base: "5rem", md: "0" }}
+    >
+      <Header />
+      <Box
+        minH="11.1rem"
+        bg="primary.500"
+        position="relative"
+        zIndex="2"
+        display={{ base: "none", md: "block" }}
+      />
+      <Box
+        position={{ base: "relative", md: "absolute" }}
+        zIndex="2"
+        top={{ md: "9.4rem" }}
+        left="50%"
+        transform="translateX(-50%)"
+        // lg, md, sm
+        minW={{ base: "70vw", md: "80vw", lg: "90vw" }}
+      >
+        <Center
+          rounded={{ md: "lg" }}
+          minH={{ base: "6.6rem", md: "9.6rem" }}
+          mb={{ base: "2.6rem", md: "3.5rem" }}
+          bg={{ base: "primary.500", md: "primary.900" }}
+        >
+          {headerMemo}
+        </Center>
+        {childrenMemo}
+      </Box>
+      <Center mt="20rem" display={{ base: "none", md: "block" }}>
+        <Image src={glowingAgave} boxSize="145rem" alt="glowing agave log" />
+      </Center>
+    </Box>
+  );
+};

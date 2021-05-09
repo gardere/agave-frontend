@@ -14,8 +14,9 @@ import { IMarketData } from "../../utils/constants";
 import { useApprovalMutation } from "../../mutations/approval";
 import { Button } from "react-bootstrap";
 import { ethers } from "ethers";
-import { capitalize } from "@material-ui/core/utils";
 
+
+const capitalize = (str: string) => str.substring(0, 1).toLocaleUpperCase() + str.slice(1);
 
 const DepositWithdrawConfirmWrapper = styled.div`
   height: 100%;

@@ -1,46 +1,18 @@
 import { BigNumberish, parseFixed } from "@ethersproject/bignumber";
 import { BigNumber, FixedNumber } from "ethers";
 import React, { ReactNode, useEffect, useMemo, useState } from "react";
-import styled from "styled-components";
-import * as Mui from "@material-ui/core";
-
-const WeiBoxWrapper = styled.div`
-  margin-bottom: 20px;
-  width: 100%;
-  border: 1px solid ${(props) => props.theme.color.textPrimary};
-  padding: 15px;
-  border-radius: 2px;
-  display: flex;
-  justify-content: space-between;
-
-  .content-label {
-    font-weight: 400;
-    color: ${(props) => props.theme.color.textPrimary};
-  }
-
-  .content-value {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    .token-amount {
-      display: flex;
-      align-items: center;
-      img {
-        width: 16px;
-        height: 16px;
-        margin-right: 5px;
-      }
-
-      span {
-        font-size: 16px;
-      }
-    }
-
-    .usd-amount {
-      font-size: 10px;
-    }
-  }
-`;
+import {
+  Button,
+  HStack,
+  Image,
+  Input,
+  InputGroup,
+  InputLeftElement,
+  InputProps,
+  InputRightElement,
+  Text,
+} from "@chakra-ui/react";
+import { RepeatIcon } from "@chakra-ui/icons";
 
 // Equate (BigNumber | undefined) instances with eachother
 function eqBigNumberOptions(
@@ -101,10 +73,31 @@ export interface WeiBoxProps {
   setAmount: (newValue: BigNumber | undefined) => void;
   // Dual mode enables both displays as textboxes, while int and fixed display one format or the other
   mode?: "dual" | "int" | "fixed";
-  icon?: ReactNode | undefined;
+  icon?: string | ReactNode | undefined;
   minAmount?: BigNumber | undefined;
   maxAmount?: BigNumber | undefined;
 }
+
+const TextInput: React.FC<InputProps> = props => {
+  return (
+    <Input
+      size="lg"
+      pl={{ base: "3.5rem", md: "5rem" }}
+      pr={{ base: "13rem", md: "15rem" }}
+      py="2rem"
+      fontSize={{ base: "1.4rem", md: "1.6rem" }}
+      alignItems="center"
+      _hover={{ background: "primary.500", color: "secondary.900" }}
+      _focus={{ background: "secondary.900", color: "white" }}
+      variant="filled"
+      background="secondary.900"
+      placeholder="Enter amount"
+      color="white"
+      rounded="xl"
+      {...props}
+    />
+  );
+};
 
 export const WeiInput: React.FC<WeiInputProps> = ({
   amount,
@@ -250,43 +243,119 @@ export const WeiBox: React.FC<WeiBoxProps> = ({
   setAmount,
   maxAmount,
   minAmount,
+  icon,
 }) => {
+  const [weiView, setWeiView] = React.useState(false);
+
+  const leftElem = React.useMemo(
+    () =>
+      icon ? (
+        <InputLeftElement
+          boxSizing="content-box"
+          w="max-content"
+          mx={4}
+          h="100%"
+          children={
+            typeof icon === "string" ? (
+              <Image
+                src={icon}
+                boxSize={{ base: "2rem", md: "3rem" }}
+                alt="Image left element for WeiBox"
+              />
+            ) : (
+              icon
+            )
+          }
+        />
+      ) : null,
+    [icon]
+  );
+
+  const rightElem = React.useMemo(
+    () => (
+      <InputRightElement minWidth="4.5rem" height="100%" w="max-content">
+        <HStack spacing="1rem" mr="1rem" height="100%">
+          <Text fontSize={{ base: "1.4rem", md: "inherit" }} color="white">
+            {weiView ? " Wei" : " Tokens"}
+          </Text>
+          <Button
+            fontSize={{ base: "1.4rem", md: "inherit" }}
+            h="100%"
+            size="xl"
+            background="transparent"
+            _hover={{ background: "transparent", outline: "none" }}
+            color="white"
+            fontWeight="bold"
+            onClick={() => setWeiView(!weiView)}
+            alt="Change input mode between Wei and decimal number of Tokens"
+          >
+            <RepeatIcon pointerEvents="none" />
+          </Button>
+          {maxAmount !== undefined ? (
+            <>
+              &nbsp;
+              <Button
+                fontSize={{ base: "1.4rem", md: "inherit" }}
+                h="100%"
+                size="xl"
+                background="transparent"
+                _hover={{ background: "transparent", outline: "none" }}
+                color="white"
+                fontWeight="bold"
+                onClick={() => setAmount(maxAmount)}
+              >
+                MAX
+              </Button>
+            </>
+          ) : null}
+        </HStack>
+      </InputRightElement>
+    ),
+    [weiView, setWeiView, setAmount, maxAmount]
+  );
+
+  const inputElem = React.useMemo(
+    () =>
+      weiView ? (
+        <WeiInput
+          amount={amount}
+          setAmount={setAmount}
+          minAmount={minAmount}
+          maxAmount={maxAmount}
+        >
+          {({ value, setValue, error }) => (
+            <TextInput
+              value={value}
+              onChange={ev => setValue(ev.target.value)}
+              isInvalid={error !== undefined}
+            />
+          )}
+        </WeiInput>
+      ) : (
+        <FixedDecimalInput
+          amount={amount}
+          setAmount={setAmount}
+          minAmount={minAmount}
+          maxAmount={maxAmount}
+          decimals={decimals}
+        >
+          {({ value, setValue, error }) => (
+            <TextInput
+              value={value}
+              onChange={ev => setValue(ev.target.value)}
+              isInvalid={error !== undefined}
+            />
+          )}
+        </FixedDecimalInput>
+      ),
+    [weiView, amount, decimals, maxAmount, minAmount, setAmount]
+  );
+
   return (
-    <Mui.Box>
-      <FixedDecimalInput
-        amount={amount}
-        setAmount={setAmount}
-        minAmount={minAmount}
-        maxAmount={maxAmount}
-        decimals={decimals}
-      >
-        {({ value, setValue, error }) => (
-          <Mui.TextField
-            label="Tokens"
-            variant="outlined"
-            error={error}
-            value={value}
-            onChange={(ev) => setValue(ev.target.value)}
-          />
-        )}
-      </FixedDecimalInput>
-      <WeiInput
-        amount={amount}
-        setAmount={setAmount}
-        minAmount={minAmount}
-        maxAmount={maxAmount}
-      >
-        {({ value, setValue, error }) => (
-          <Mui.TextField
-            label="Wei"
-            variant="outlined"
-            error={error}
-            value={value}
-            onChange={(ev) => setValue(ev.target.value)}
-            type="number"
-          />
-        )}
-      </WeiInput>
-    </Mui.Box>
+    <InputGroup>
+      {leftElem}
+      {inputElem}
+      {rightElem}
+    </InputGroup>
   );
 };
