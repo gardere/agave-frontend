@@ -4,6 +4,9 @@ import {
   Erc20abi__factory,
   StakedToken__factory,
   AaveDistributionManager__factory,
+  AgaveLendingABI__factory,
+  ILendingPoolAddressesProvider__factory,
+  IPriceOracleGetter__factory,
 } from "../../contracts";
 import { getChainAddresses } from "../../utils/chainAddresses";
 import {
@@ -53,7 +56,7 @@ export const useTotalRewardsBalance = buildQueryHook<
     return balance;
   },
   addr => ["staking", "rewards", addr],
-  () => constants.Zero
+  () => undefined
 );
 
 export const useStakingEvents = buildQueryHook<
@@ -89,7 +92,7 @@ export const useStakingEvents = buildQueryHook<
     return balance;
   },
   stakerAddress => ["staking", "events", stakerAddress],
-  () => constants.Zero
+  () => undefined
 );
 
 export const useStakingCooldown = buildQueryHookWhenParamsDefinedChainAddrs<
@@ -105,7 +108,7 @@ export const useStakingCooldown = buildQueryHookWhenParamsDefinedChainAddrs<
     return await contract.COOLDOWN_SECONDS();
   },
   () => ["staking", "cooldown"],
-  () => constants.Zero
+  () => undefined
 );
 
 export const useUnstakeWindow = buildQueryHookWhenParamsDefinedChainAddrs<
@@ -121,7 +124,7 @@ export const useUnstakeWindow = buildQueryHookWhenParamsDefinedChainAddrs<
     return await contract.UNSTAKE_WINDOW();
   },
   () => ["staking", "unstakeWindow"],
-  () => constants.Zero
+  () => undefined
 );
 
 export const useTotalStakedForAllUsers = buildQueryHookWhenParamsDefinedChainAddrs<
@@ -174,7 +177,7 @@ export const useAmountClaimableBy = buildQueryHookWhenParamsDefinedChainAddrs<
   [
     _prefixStaking: "staking",
     _prefixRewards: "claimable",
-    stakerAddress: string | undefined,
+    stakerAddress: string | undefined
   ],
   [stakerAddress: string]
 >(
@@ -244,10 +247,41 @@ export const useStakingPerSecondPerAgaveYield = buildQueryHookWhenParamsDefinedC
       params.chainAddrs.staking
     );
     const emissionPerSecond = stakedTokenAssetInfo.emissionPerSecond;
-    return emissionPerSecond
-      .mul(constants.WeiPerEther)
-      .div(totalStaked);
+    return emissionPerSecond.mul(constants.WeiPerEther).div(totalStaked);
   },
   () => ["staking", "perSecondPerAgaveYield"],
+  () => undefined
+);
+
+export const useStakingAgavePrice = buildQueryHookWhenParamsDefinedChainAddrs<
+  BigNumber,
+  [_prefixStaking: "staking", _prefixAgavePrice: "agavePrice"],
+  []
+>(
+  async params => {
+    const signer = params.library.getSigner();
+    const stakingContract = StakedToken__factory.connect(
+      params.chainAddrs.staking,
+      signer
+    );
+    const lendingPool = AgaveLendingABI__factory.connect(
+      params.chainAddrs.lendingPool,
+      signer
+    );
+    const [addressProvider, stakedTokenAddress] = await Promise.all([
+      lendingPool
+        .getAddressesProvider()
+        .then(addr =>
+          ILendingPoolAddressesProvider__factory.connect(addr, signer)
+        ),
+      stakingContract.STAKED_TOKEN(),
+    ]);
+    const priceOracle = await addressProvider
+      .getPriceOracle()
+      .then(addr => IPriceOracleGetter__factory.connect(addr, signer));
+    const price = await priceOracle.getAssetPrice(stakedTokenAddress);
+    return price;
+  },
+  () => ["staking", "agavePrice"],
   () => undefined
 );

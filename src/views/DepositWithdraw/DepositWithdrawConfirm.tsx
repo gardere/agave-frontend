@@ -12,8 +12,9 @@ import { useDepositMutation } from "../../mutations/deposit";
 import { useWithdrawMutation } from "../../mutations/withdraw";
 import { IMarketData } from "../../utils/constants";
 import { useApprovalMutation } from "../../mutations/approval";
-import { Button } from "react-bootstrap";
 import { ethers } from "ethers";
+import { VStack, Text, Button } from "@chakra-ui/react";
+import ColoredText from "../../components/ColoredText";
 
 
 const capitalize = (str: string) => str.substring(0, 1).toLocaleUpperCase() + str.slice(1);
@@ -217,15 +218,29 @@ export const DepositWithdrawConfirm: React.FC<void> = () => {
     <Page>
       <DepositWithdrawConfirmWrapper>
         {asset ? <DepositWithdrawOverview asset={asset} /> : <></>}
-        <div className="content-wrapper">
+        <VStack       
+          w="50%"
+          justifyContent="space-between"
+          px={{ base: "1.1rem", md: "2.2rem" }}
+          py={{ base: "1.3rem", md: "1.9rem" }}
+          bg="primary.900"
+          rounded="2xl"
+          position="relative"
+          minH="14.4rem"
+          >
           <div className="basic-form">
             <div className="basic-form-header">
-              <div className="basic-form-header-title">
+              <ColoredText>
                 {capitalize(action)} overview
-                            </div>
-              <div className="basic-form-header-content">
+              </ColoredText>
+              <Text
+                color="white"
+                textAlign="center"
+                marginBottom="2.8rem"
+                fontSize={{ base: "1.4rem", md: "inherit" }}
+              >
                 These are your transaction details. Make sure to check if this is correct before submitting.
-                            </div>
+              </Text>
             </div>
 
             <div className="basic-form-content">
@@ -252,7 +267,7 @@ export const DepositWithdrawConfirm: React.FC<void> = () => {
             </div>
 
           </div>
-        </div>
+        </VStack>
       </DepositWithdrawConfirmWrapper>
     </Page>
   )
@@ -354,7 +369,14 @@ export const SubmissionStep: React.FC<{
           </div>
           <div className="form-action-body-right">
             <Button
-              variant="secondary"
+              mt="2.4rem"
+              textTransform="uppercase"
+              background="linear-gradient(90.53deg, #9BEFD7 0%, #8BF7AB 47.4%, #FFD465 100%);"
+              color="secondary.900"
+              fontWeight="bold"
+              px={{ base: "10rem", md: "6rem" }}
+              py="1.5rem"
+              fontSize="1.4rem"
               disabled={actionMutation.isLoading || approvalMutation.isLoading}
               onClick={() => {
                 actionMutation

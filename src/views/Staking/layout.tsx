@@ -21,13 +21,15 @@ import { useDisclosure } from "@chakra-ui/hooks";
 import ColoredText from "../../components/ColoredText";
 import { BigNumber, BigNumberish, constants, FixedNumber } from "ethers";
 import coloredAgaveLogo from "../../assets/image/colored-agave-logo.svg";
-import { useTotalStakedForAllUsers } from "./queries";
+import { useStakingAgavePrice, useTotalStakedForAllUsers } from "./queries";
 
 export interface StakingBannerProps {}
 
 export interface StakingLayoutProps {
   yieldPerAgavePerSecond: BigNumber | undefined;
   cooldownPeriodSeconds: BigNumberish | undefined;
+  unstakeWindowSeconds: BigNumberish | undefined;
+  agavePriceUsd: BigNumber | undefined;
   amountStaked: BigNumber | undefined;
   availableToClaim: BigNumber | undefined;
   availableToStake: BigNumber | undefined;
@@ -38,11 +40,29 @@ export interface StakingLayoutProps {
 }
 
 export const StakingBanner: React.FC<StakingBannerProps> = props => {
-  // TODO: Change TVL to dollar amount rather than AGVE ammount
-  const { data: totalAgaveStaked } = useTotalStakedForAllUsers();
-  const tvl = totalAgaveStaked
-    ? FixedNumber.fromValue(totalAgaveStaked, 18).round(4).toString()
-    : "0"; //(1782531.59).toLocaleString();
+  const totalAgaveStaked = useTotalStakedForAllUsers().data;
+  const agavePriceInNative = useStakingAgavePrice().data;
+  const tokensLocked = totalAgaveStaked
+    ? (totalAgaveStaked
+        ? FixedNumber.fromValue(totalAgaveStaked, 18).round(2).toString()
+        : "0") + " AGVE"
+    : undefined;
+  const tvl =
+    agavePriceInNative !== undefined
+      ? "$ " +
+        (totalAgaveStaked
+          ? FixedNumber.fromValue(
+              totalAgaveStaked
+                .mul(agavePriceInNative)
+                .div(constants.WeiPerEther),
+              18
+            )
+              .round(2)
+              .toUnsafeFloat()
+              .toLocaleString()
+          : "0.00") +
+        ` (${tokensLocked})`
+      : tokensLocked;
 
   return (
     <Center
@@ -61,21 +81,25 @@ export const StakingBanner: React.FC<StakingBannerProps> = props => {
         flexDirection={{ base: "column", md: "row" }}
         alignItems={{ base: "flex-end", md: "center" }}
       >
-        <Text
-          color="white"
-          fontSize={{ base: "1.2rem", md: "1.6rem" }}
-          mr={{ md: "1.2rem" }}
-        >
-          Funds in the Safety Module
-        </Text>
-        <Text
-          fontSize={{ base: "1.6rem", md: "2.4rem" }}
-          fontWeight="bold"
-          bg="linear-gradient(90.53deg, #9BEFD7 0%, #8BF7AB 47.4%, #FFD465 100%);"
-          backgroundClip="text"
-        >
-          {tvl} AGVE
-        </Text>
+        {tvl ? (
+          <>
+            <Text
+              color="white"
+              fontSize={{ base: "1.2rem", md: "1.6rem" }}
+              mr={{ md: "1.2rem" }}
+            >
+              Funds in the Safety Module
+            </Text>
+            <Text
+              fontSize={{ base: "1.6rem", md: "2.4rem" }}
+              fontWeight="bold"
+              bg="linear-gradient(90.53deg, #9BEFD7 0%, #8BF7AB 47.4%, #FFD465 100%);"
+              backgroundClip="text"
+            >
+              {tvl}
+            </Text>
+          </>
+        ) : null}
       </Center>
     </Center>
   );
@@ -187,12 +211,28 @@ const StakingSubCard: React.FC<{
   );
 };
 
+export function secondsToString(numSeconds: BigNumberish): String {
+  const cdps = BigNumber.from(numSeconds);
+  if (cdps.lt(60)) {
+    return `${Math.round(cdps.toNumber() * 10) / 10} seconds`;
+  }
+  if (cdps.lt(60 * 60)) {
+    return `${Math.round((cdps.toNumber() / 60) * 10) / 10} minutes`;
+  }
+  if (cdps.lt(60 * 60 * 24)) {
+    return `${Math.round((cdps.toNumber() / (60 * 60)) * 10) / 10} hours`;
+  }
+  return `${Math.round((cdps.toNumber() / (60 * 60 * 24)) * 10) / 10} days`;
+}
+
 export const StakingLayout: React.FC<StakingLayoutProps> = ({
   yieldPerAgavePerSecond,
   cooldownPeriodSeconds,
+  unstakeWindowSeconds,
   amountStaked,
   availableToClaim,
   availableToStake,
+  agavePriceUsd,
   activateCooldown,
   claimRewards,
   stake,
@@ -200,58 +240,84 @@ export const StakingLayout: React.FC<StakingLayoutProps> = ({
 }) => {
   const [customAddress, setCustomAddress] = useState<string>("");
   function dollarValueStringOf(agaveAmount: BigNumber | undefined): String {
-    return "-";
+    if (agavePriceUsd === undefined || agaveAmount === undefined) {
+      return "-";
+    }
+    return FixedNumber.fromValue(
+      agavePriceUsd.mul(agaveAmount).div(constants.WeiPerEther),
+      18
+    )
+      .round(2)
+      .toString();
   }
 
   const cooldownPeriod = React.useMemo(() => {
     if (cooldownPeriodSeconds === undefined) {
       return "-";
     }
-    const cdps = BigNumber.from(cooldownPeriodSeconds);
-    if (cdps.lt(60 * 60)) {
-      return `${Math.round((cdps.toNumber() / 60) * 10) / 10} minutes`;
-    }
-    if (cdps.lt(60 * 60 * 24)) {
-      return `${Math.round((cdps.toNumber() / (60 * 60)) * 10) / 10} hours`;
-    }
-    return `${Math.round((cdps.toNumber() / (60 * 60 * 24)) * 10) / 10} days`;
+    return secondsToString(cooldownPeriodSeconds);
   }, [cooldownPeriodSeconds]);
+
+  const unstakeWindow = React.useMemo(() => {
+    if (unstakeWindowSeconds === undefined) {
+      return "-";
+    }
+    return secondsToString(unstakeWindowSeconds);
+  }, [unstakeWindowSeconds]);
+
   const [amount, setAmount] = React.useState<BigNumber | undefined>(
     BigNumber.from(0)
   );
-  const yieldPerMonth = yieldPerAgavePerSecond?.mul(60 * 60 * 24 * 31);
-  const yieldPerYear = yieldPerAgavePerSecond?.mul(60 * 60 * 24 * 365);
-  const stakingAPY =
-    amountStaked?.gt(0) && yieldPerYear?.gt(0)
-      ? FixedNumber.fromValue(
-          amountStaked
-            .add(yieldPerYear)
-            // .div(constants.WeiPerEther)
-            .sub(amountStaked),
-          // .divUnsafe(FixedNumber.fromValue(amountStaked.add(yieldPerYear), 18))
-          // .subUnsafe(FixedNumber.fromValue(constants.WeiPerEther, 18))
-          18
-        )
-          .round(2)
-          .toString()
-      : amountStaked !== undefined && yieldPerYear !== undefined
-      ? "0"
-      : "-";
+  const yieldPerSecond = React.useMemo(
+    () =>
+      amountStaked
+        ? yieldPerAgavePerSecond?.mul(amountStaked).div(constants.WeiPerEther)
+        : undefined,
+    [amountStaked, yieldPerAgavePerSecond]
+  );
+
+  const [yieldPerMonth, yieldPerYear] = React.useMemo(
+    () => [
+      yieldPerSecond?.mul(60 * 60 * 24 * 31),
+      yieldPerSecond?.mul(60 * 60 * 24 * 365),
+    ],
+    [yieldPerSecond]
+  );
+  const stakingAPY = React.useMemo(
+    () =>
+      amountStaked?.gt(0) && yieldPerYear?.gt(0)
+        ? FixedNumber.fromValue(
+            amountStaked
+              .add(yieldPerYear)
+              // .div(constants.WeiPerEther)
+              .sub(amountStaked),
+            // .divUnsafe(FixedNumber.fromValue(amountStaked.add(yieldPerYear), 18))
+            // .subUnsafe(FixedNumber.fromValue(constants.WeiPerEther, 18))
+            18
+          )
+            .round(2)
+            .toString()
+        : amountStaked !== undefined && yieldPerYear !== undefined
+        ? "0"
+        : "-",
+    [amountStaked, yieldPerYear]
+  );
   return (
     <HStack
-      boxSizing="border-box"
       spacing={{ md: "1.6rem" }}
       flexDirection={{ base: "column", md: "row" }}
       px={{ base: "2.4rem", md: "0" }}
     >
       <Center
+        boxSizing="content-box"
         flexDirection="column"
         rounded="xl"
         minH="35.6rem"
         minW={{ base: "100%", md: "inherit" }}
         flex={1}
         bg="primary.900"
-        px={{ base: "2rem", md: "5.2rem" }}
+        px={{ base: "2rem", md: "4rem" }}
+        py="2.4rem"
         mb={{ base: "2.6rem", md: "0" }}
       >
         <ColoredText
@@ -304,19 +370,32 @@ export const StakingLayout: React.FC<StakingLayoutProps> = ({
           px={{ base: "10rem", md: "6rem" }}
           py="1.5rem"
           fontSize="1.4rem"
-          disabled={amount === undefined || amount.lte(0)}
+          disabled={
+            amount === undefined ||
+            amount.lte(0) ||
+            availableToStake === undefined ||
+            amount.gt(availableToStake)
+          }
+          onClick={() => {
+            if (amount) {
+              setAmount(constants.Zero);
+              stake(amount);
+            }
+          }}
         >
           Stake
         </Button>
       </Center>
       <Center
+        boxSizing="content-box"
         flexDirection="column"
         rounded="xl"
         minH="35.6rem"
         minW={{ base: "100%", md: "inherit" }}
         flex={1}
         bg="primary.900"
-        px={{ base: "2rem", md: "5rem" }}
+        px={{ base: "2rem", md: "4rem" }}
+        py="2.4rem"
         mb={{ base: "2.6rem", md: "0" }}
       >
         <HStack spacing={{ base: "1rem", md: "2rem" }} w="100%">
@@ -395,6 +474,10 @@ export const StakingLayout: React.FC<StakingLayoutProps> = ({
           <Flex width="100%" justifyContent="space-between">
             <Text>Cooldown period</Text>
             <Text fontWeight="bold">{cooldownPeriod}</Text>
+          </Flex>
+          <Flex width="100%" justifyContent="space-between">
+            <Text>Unstake Window</Text>
+            <Text fontWeight="bold">{unstakeWindow}</Text>
           </Flex>
           <Flex width="100%" justifyContent="space-between">
             <Text>Staking APY</Text>

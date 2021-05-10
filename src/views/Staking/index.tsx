@@ -4,7 +4,17 @@ import React from "react";
 import { useAppWeb3 } from "../../hooks/appWeb3";
 import { getChainAddresses } from "../../utils/chainAddresses";
 import { StakingLayout } from "./layout";
-import { useAmountAvailableToStake, useAmountClaimableBy, useAmountStakedBy, useStakingCooldown, useStakingPerSecondPerAgaveYield, useTotalStakedForAllUsers } from "./queries";
+import { useStakeMutation } from "./mutations";
+import {
+  useAmountAvailableToStake,
+  useAmountClaimableBy,
+  useAmountStakedBy,
+  useStakingAgavePrice,
+  useStakingCooldown,
+  useStakingPerSecondPerAgaveYield,
+  useTotalStakedForAllUsers,
+  useUnstakeWindow,
+} from "./queries";
 
 export interface StakingProps {}
 
@@ -28,11 +38,32 @@ const StakingErrorWrapper: React.FC = ({ children }) => {
 
 export const Staking: React.FC<StakingProps> = _props => {
   const w3 = useAppWeb3(); // We don't unpack because otherwise typescript loses useAppWeb3's magic
-  const { data: stakingPerSecondPerAgaveYield } = useStakingPerSecondPerAgaveYield();
+  const {
+    data: stakingPerSecondPerAgaveYield,
+  } = useStakingPerSecondPerAgaveYield();
   const { data: amountStaked } = useAmountStakedBy(w3.account ?? undefined);
-  const { data: availableToStake } = useAmountAvailableToStake(w3.account ?? undefined);
-  const { data: availableToClaim } = useAmountClaimableBy(w3.account ?? undefined);
-  const cooldownPeriodSeconds = useStakingCooldown().data ?? 60 * 60 * 24 * 10;
+  const { data: availableToStake } = useAmountAvailableToStake(
+    w3.account ?? undefined
+  );
+  const { data: availableToClaim } = useAmountClaimableBy(
+    w3.account ?? undefined
+  );
+  const cooldownPeriodSeconds = useStakingCooldown().data;
+  const unstakeWindowSeconds = useUnstakeWindow().data;
+  const stakeMutation = useStakeMutation({
+    chainId: w3.chainId ?? undefined,
+    address: w3.account ?? undefined,
+  });
+  const agavePriceInNative = useStakingAgavePrice().data;
+  console.log(agavePriceInNative);
+  const stakeMutationCall = React.useMemo(
+    () => (amount: BigNumber) =>
+      w3.library
+        ? stakeMutation.mutate({ amount, library: w3.library })
+        : undefined,
+    [stakeMutation, w3.library]
+  );
+
   if (w3.library == null) {
     return (
       <StakingErrorWrapper>
@@ -43,6 +74,7 @@ export const Staking: React.FC<StakingProps> = _props => {
       </StakingErrorWrapper>
     );
   }
+
   const chainAddrs = getChainAddresses(w3.chainId);
   if (chainAddrs == null) {
     return (
@@ -58,12 +90,14 @@ export const Staking: React.FC<StakingProps> = _props => {
     <StakingLayout
       yieldPerAgavePerSecond={stakingPerSecondPerAgaveYield}
       cooldownPeriodSeconds={cooldownPeriodSeconds}
+      unstakeWindowSeconds={unstakeWindowSeconds}
+      agavePriceUsd={agavePriceInNative}
       amountStaked={amountStaked}
       availableToClaim={availableToClaim}
       availableToStake={availableToStake}
       activateCooldown={() => {}}
       claimRewards={(toAddress: string) => {}}
-      stake={(amount: BigNumber) => {}}
+      stake={stakeMutationCall}
       unstake={() => {}}
     />
   );
